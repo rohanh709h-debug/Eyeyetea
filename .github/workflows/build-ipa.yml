@@ -1,0 +1,33 @@
+name: Build IPA
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: |
+          DIR=$(dirname "$(find . -name project.yml | head -1)")
+          echo "DIR=$DIR" >> $GITHUB_ENV
+          cd "$DIR"
+          xcodegen generate
+      - name: Build (unsigned)
+        run: |
+          cd "$DIR"
+          xcodebuild -project EyeRest.xcodeproj -scheme EyeRest \
+            -configuration Release -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      - name: Package IPA
+        run: |
+          cd "$DIR"
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/EyeRest.app Payload/
+          zip -qr EyeRest.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EyeRest-ipa
+          path: ${{ env.DIR }}/EyeRest.ipa
